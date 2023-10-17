@@ -1,24 +1,19 @@
-import logo from './logo.svg';
 import './App.css';
-
+import { AdminLayout } from './layout';
+import { KProcess } from './pages/KProcess';
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { InnerProductivity } from './pages/InnerProductivity';
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AdminLayout />}>
+          {/* <Route path="/" element={<ResourceManagement />} /> */}
+          <Route path="/" element={<KProcess />} />
+          <Route path='/productivity' element={<InnerProductivity />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
