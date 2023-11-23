@@ -199,3 +199,26 @@ export const plantationData = (data) => {
     ]
     return finalData
 }
+
+export const customStyles = {
+    container: provided => ({
+        ...provided,
+        minWidth:250,
+        maxWidth: 300,
+        // zIndex: 9999999999,
+        // Ensure the dropdown is rendered above other elements
+    }),
+    valueContainer: (provided, state) => ({
+        ...provided,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        flexWrap: 'nowrap',
+    }),
+    menuPortal: base => ({
+        ...base,
+        zIndex: 99, // Ensure the dropdown is rendered above other elements
+    }),
+    menu: (base) => ({
+        ...base, zIndex: 999, // Ensure the dropdown is rendered above other elements
+    }),
+};

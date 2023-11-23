@@ -1,15 +1,16 @@
 import { ApexChart } from "../../components/ApexBarChart"
-import { options, options2, options3, options4, dounut1, namesSort } from "./data"
+import { toptions, options2, options3, options4, dounut1, namesSort } from "./data"
 import PieChart from "../../components/PieChart"
 import { BiUpArrowAlt } from 'react-icons/bi'
 import { BiDownArrowAlt } from 'react-icons/bi'
 import AreaChart from "../../components/AreaChart/areacahrt"
 import { useEffect, useState, useRef } from "react"
 import { RxDotFilled } from 'react-icons/rx'
-import { getTitle, getData } from '../../utils'
+import { getTitle, getData, customStyles } from '../../utils'
 import { LineChart } from "../../components/LineChart"
 import axios from "axios";
-import { aseries, aoptions, aoptions2, aoptions3, aseries2, aseries3 } from "../../components/AreaChart/data"
+import makeAnimated from 'react-select/animated';
+import { aoptions, aoptions2, aoptions3 } from "../../components/AreaChart/data"
 import { lostUnitsdata, prodOpexData, prodThroughputData, unitsLostData, unitsProdData, unitsYTDData, upTimeData, utilizationData } from "./apiData"
 import { Popup } from "../../components/Popup"
 import { UnitsYTD } from "./InnerProductivity/unitsYTD/unitsYTD"
@@ -20,7 +21,15 @@ import { LostUnitsCauses } from "./InnerProductivity/lost-units-causes"
 import { OveralProductivityUptime } from "./InnerProductivity/overal-productivity-uptime/unitsLost"
 import { ProductivityThroughput } from "./InnerProductivity/productivity-throughput"
 import { ProductivityOpex } from "./InnerProductivity/productivity-opex"
+import Select from 'react-select';
 const ADAPTERS_BASE_URL = process.env.REACT_APP_BASE_URL;
+
+export const getLabels = (data) => {
+    const finalData = data[0].data.map((item, index) => {
+        return data[0].label[index].substring(0, 3)
+    })
+    return finalData
+}
 
 export const InnerProductivity = () => {
     const [show, setShow] = useState(false)
@@ -38,7 +47,32 @@ export const InnerProductivity = () => {
     const [showModal, setShowModal] = useState(false)
     const [title, setTitle] = useState("")
     const [selData, setSelData] = useState([])
-    console.log(ADAPTERS_BASE_URL)
+    const animatedComponents = makeAnimated();
+    const [selectedDS, setSelectedDS] = useState(null);
+    const [selectedOrg, setSelectedOrg] = useState(null);
+    const [selectedKpi, setSelectedKpi] = useState(null);
+    const [manualData, setManualData] = useState(false)
+    const handleChangeDS = (selectedOption) => {
+        setSelectedDS(selectedOption);
+    };
+
+    const handleChangeOrg = (selectedOption) => {
+        setSelectedOrg(selectedOption);
+    };
+
+    const handleChangeKpi = (selectedOption) => {
+        setSelectedKpi(selectedOption);
+    };
+    const datasources = [
+        { value: 'Manual', label: 'Manual' },
+        { value: 'IOT', label: 'IOT' },
+        { value: 'Operational Datastore', label: 'Operational Datastore' }
+    ]
+    const options = [
+        { value: 'Heavy machinery', label: 'Heavy machinery' },
+        { value: 'Automotive', label: 'Automotive' },
+        { value: 'Paper and pulp', label: 'Paper and pulp' }
+    ]
     const fetchData = async () => {
         try {
             await axios.get(`${ADAPTERS_BASE_URL}/productivity/getData`).then((response) => {
@@ -52,9 +86,33 @@ export const InnerProductivity = () => {
         }
     }
 
+    const downloadData = async () => {
+        console.log(selectedKpi)
+        const list = selectedKpi.map((item) => item.value)
+        try {
+            await axios.get(`${ADAPTERS_BASE_URL}/productivity/download/organization=${selectedOrg.value}/list=${list.toString()}`).then((response) => {
+                //    const data = JSON.parse(response?.data?.replace(/\bNaN\b/g, "null"));
+                const data = response?.data
+                // console.log(JSON.parse(data))
+                setApiData(data.result);
+            });
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
     useEffect(() => {
-        fetchData()
-    }, [])
+        if (selectedDS?.value === 'IOT') {
+            // downloadData()
+            setManualData(false)
+            setApiData([])
+        } else if (selectedDS?.value === 'Manual') {
+            setApiData([])
+            if (manualData) {
+                fetchData()
+            }
+        }
+    }, [selectedDS, manualData])
 
     const data = [
         {
@@ -109,6 +167,18 @@ export const InnerProductivity = () => {
             await axios.post(`${ADAPTERS_BASE_URL}/productivity/FileUpload`, formData)
                 .then((response) => {
                     fetchData()
+                    setManualData(true)
+                });
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
+    const handleReports = async () => {
+        try {
+            await axios.get(`${ADAPTERS_BASE_URL}/download`)
+                .then((response) => {
+                    console.log(response)
                 });
         } catch (err) {
             console.log(err)
@@ -127,51 +197,67 @@ export const InnerProductivity = () => {
         setfunc(showVal)
     }
 
+    const kpidata = [{
+        label: "Units YTD", children: <UnitsYTD {...{ selData }} />, size: "lg", value: "kpUnitsYTD.csv"
+    }, {
+        label: "Units Lost", value: "kpUnitsLost.csv", children: <UnitsLost {...{ selData }} />, size: "lg"
+    },
+    {
+        label: "Overall Plant Productivity", value: "kpPlantProd.csv", children: <OveralPlantProductivity {...{ selData }} />, size: "lg"
+    },
+    {
+        label: "Overall Productivity - Utilization (YTD)", value: "kpUtilization.csv", children: <OveralProductivityUtilization {...{ selData }} />, size: "xl"
+    },
+    {
+        label: "Lost Units:Causes", value: "kpLostCause.csv", children: <LostUnitsCauses {...{ selData }} />, size: "xl", estimate: true
+    },
+    {
+        label: "Overall Productivity - Uptime (YTD)", value: "kpUptime.csv", children: <OveralProductivityUptime {...{ selData }} />, size: "xl"
+    },
+    {
+        label: "Productivity - Throughout", value: "kpThroughput.csv", children: <ProductivityThroughput {...{ selData }} />, size: "xl"
+    },
+    {
+        label: "Productivity - OpEx", value: "kpOpEx.csv", children: <ProductivityOpex {...{ selData }} />, size: "xl"
+    }]
 
     const getCharts = () => {
-        const data = [{
-            title: "Units YTD", children: <UnitsYTD {...{ selData }} />, size: "lg"
-        }, {
-            title: "Units Lost", children: <UnitsLost {...{ selData }} />, size: "lg"
-        },
-        {
-            title: "Overall Plant Productivity", children: <OveralPlantProductivity {...{ selData }} />, size: "lg"
-        },
-        {
-            title: "Overall Productivity - Utilization (YTD)", children: <OveralProductivityUtilization {...{ selData }} />, size: "xl"
-        },
-        {
-            title: "Lost Units:Causes", children: <LostUnitsCauses {...{ selData }} />, size: "xl", estimate: true
-        },
-        {
-            title: "Overall Productivity - Uptime (YTD)", children: <OveralProductivityUptime {...{ selData }} />, size: "xl"
-        },
-        {
-            title: "Productivity - Throughout", children: <ProductivityThroughput {...{ selData }} />, size: "xl"
-        },
-        {
-            title: "Productivity - OpEx", children: <ProductivityOpex {...{ selData }} />, size: "xl"
-        }]
-        const final = data.filter((item) => {
-            if (item.title == title) return true
+        const final = kpidata.filter((item) => {
+            if (item.label === title) return true
         })
         return final[0]
+    }
+
+
+    const getFilterData = () => {
+        // const filterData = apidata.filter((item) => {
+        //     return selectedKpi.filter((child) => child.value === item.name).length > 0
+        // })
+        // setApiData2(filterData)
+        downloadData()
     }
 
 
     const handleGetData = (name, data5, inference, prediction) => {
         switch (name) {
             case 'kpThroughput.csv':
-                return <div className="col-6" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Productivity - Throughout", data5)}>
+                return <div className="col-6 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Productivity - Throughout", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }}>
                         <h6 className="ps-2" style={{ fontFamily: "poppins", fontWeight: 500, fontSize: '18px', fontWeight: 600, display: 'flex', justifyContent: "start" }}>Productivity - Throughout</h6>
                         <div style={{ minHeight: "265px", maxHeight: "265px", width: "100%" }}>
-                            <ApexChart series={prodThroughputData(data5)} options={options} height={"250px"} width={"100%"} />
+                            <ApexChart series={prodThroughputData(data5)} options={{
+                                ...toptions, xaxis: {
+                                    categories: getLabels(data5),
+                                    title: {
+                                        text: 'Month'
+                                    }
+                                },
+                            }} height={"250px"} width={"100%"} />
                         </div>
                     </div>
                 </div>
             case 'kpOpEx.csv':
-                return <div className="col-6" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Productivity - OpEx", data5)}>
+                return <div className="col-6 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Productivity - OpEx", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }}>
                         <h6 className="ps-2" style={{ fontFamily: "poppins", fontWeight: 500, fontSize: '18px', fontWeight: 600, display: 'flex', justifyContent: "start" }}>Productivity - OpEx</h6>
                         {/* <ApexChart series={options2.series1} options={options2} height={"250px"} width={"100%"} /> */}
@@ -181,7 +267,7 @@ export const InnerProductivity = () => {
                     </div>
                 </div>
             case 'kpUtilization.csv':
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Productivity - Utilization (YTD)", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Productivity - Utilization (YTD)", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }}>
                         <h6 className="ps-2" style={{ fontFamily: "poppins", fontWeight: 500, fontSize: '18px', fontWeight: 600, display: 'flex', justifyContent: "start" }}>Overall Productivity - Utilization (YTD)</h6>
                         <div style={{ minHeight: "265px", maxHeight: "265px", width: "100%" }}>
@@ -190,7 +276,7 @@ export const InnerProductivity = () => {
                     </div>
                 </div>
             case 'kpLostCause.csv':
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Lost Units:Causes", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Lost Units:Causes", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }}>
                         <h6 className="ps-2" style={{ fontFamily: "poppins", fontWeight: 500, fontSize: '18px', fontWeight: 600, display: 'flex', justifyContent: "start" }}>Lost Units:Causes</h6>
                         <div style={{ minHeight: "265px", maxHeight: "255px", width: "100%" }}>
@@ -199,7 +285,7 @@ export const InnerProductivity = () => {
                     </div>
                 </div>
             case 'kpUptime.csv':
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Productivity - Uptime (YTD)", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Productivity - Uptime (YTD)", data5)}>
                     <div style={{ border: '1px solid #E6E6E6', minHeight: "230px" }}>
                         <h6 className="ps-2" style={{ fontFamily: "poppins", fontWeight: 500, fontSize: '18px', fontWeight: 600, display: 'flex', justifyContent: "start" }}>Overall Productivity - Uptime (YTD)</h6>
                         {/* <ApexChart series={options4.series1} options={options4} height={"250px"} width={"100%"} /> */}
@@ -210,7 +296,7 @@ export const InnerProductivity = () => {
                 </div>
             case 'kpUnitsYTD.csv':
                 let { total, finalData } = unitsYTDData(data5)
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Units YTD", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Units YTD", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }} className="p-2">
                         <div className="d-flex justify-content-between">
                             <div>
@@ -271,7 +357,7 @@ export const InnerProductivity = () => {
                 </div>
             case 'kpUnitsLost.csv':
                 let { totallost, finalDatalost } = unitsLostData(data5)
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Units Lost", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Units Lost", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }} className="p-2">
                         <div className="d-flex justify-content-between">
                             <div>
@@ -321,7 +407,7 @@ export const InnerProductivity = () => {
                 </div>
             case 'kpPlantProd.csv':
                 let { totalprod, finalDataprod } = unitsProdData(data5)
-                return <div className="col-4" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Plant Productivity", data5)}>
+                return <div className="col-4 apexchart" style={{ cursor: "pointer" }} onClick={(e) => handlePopup(e, "Overall Plant Productivity", data5)}>
                     <div style={{ border: '1px solid #E6E6E6' }} className="p-2">
                         <div className="d-flex justify-content-between">
                             <div>
@@ -382,82 +468,145 @@ export const InnerProductivity = () => {
                 </div>
         }
     }
+
     return (
-        <div className="row ms-1">
-            <div
-                item
-                style={{
-                    display: 'flex',
-                    // padding: '12px 32px',
-                    justifyContent: 'end',
-                    alignItems: 'center',
-                    // gap: '8px',
-                    alignSelf: 'stretch',
-                    marginRight: '10px',
-                    marginTop: '5px'
-                }}
-            // onMouseEnter={() => setHover(true)}
-            // onMouseLeave={() => setHover(false)}
-            >
-                <button
-                    className="btn btn-primary"
-                    lineHeight={'24px'}
-                    height={'44px'}
-                    // startIcon={<image src={upload} />}
-                    children={'Upload CSV File'}
-                    onClick={() => handleButtonClick()}
-                />{' '}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    style={{ display: 'none' }}
-                    onChange={handleFileChange}
-                    multiple={true}
-                    accept="*"
-                />
+        <div>
+            <div className="d-flex" style={{ display: 'flex', justifyContent: "space-between", width: '100%' }}>
+                <div className=""
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'start',
+                        alignItems: 'start',
+                        marginRight: '10px',
+                        marginTop: '5px',
+                        padding: '10px'
+                    }}
+                >
+                    <div className="me-2" style={{ display: "flex", alignItems: "center" }}>
+                        <h2 style={{ fontSize: "14px", fontFamily: "poppins", marginTop: '7px', marginRight: "10px" }}>Data Source</h2>
+                        <Select
+                            styles={{
+                                ...customStyles, container: provided => ({
+                                    ...provided,
+                                    minWidth: 200,
+                                    maxWidth: 250,
+                                    // zIndex: 9999999999,
+                                    // Ensure the dropdown is rendered above other elements
+                                }),
+                            }}
+                            components={animatedComponents}
+                            onChange={handleChangeDS}
+                            options={datasources}
+                        />
+                    </div>
+                    {selectedDS?.value !== 'Manual' && <div style={{ display: 'flex' }}>
+                        <div className="" style={{ display: "flex", alignItems: "center" }}>
+                            <h2 style={{ fontSize: "14px", fontFamily: "poppins", marginTop: '7px', marginRight: "10px" }}>Industry</h2>
+                            <Select
+                                styles={{
+                                    ...customStyles, container: provided => ({
+                                        ...provided,
+                                        minWidth: 200,
+                                        maxWidth: 250,
+                                        // zIndex: 9999999999,
+                                        // Ensure the dropdown is rendered above other elements
+                                    }),
+                                }}
+                                components={animatedComponents}
+                                onChange={handleChangeOrg}
+                                options={options}
+                            />
+                        </div>
+                        <div className="d-flex">
+                            <div className="" style={{ display: "flex", justifyContent: 'center', alignItems: "center", marginLeft: '10px' }}>
+                                <h2 style={{ fontSize: "14px", fontFamily: "poppins", marginTop: '7px', marginRight: "10px" }}>KPI(s)</h2>
+                                <Select
+                                    styles={customStyles}
+                                    closeMenuOnSelect={false}
+                                    components={animatedComponents}
+                                    isMulti
+                                    onChange={handleChangeKpi}
+                                    options={kpidata}
+                                />
+                            </div>
+                            <button
+                                className=" ms-2 btn btn-primary"
+                                lineHeight={'24px'}
+                                height={'44px'}
+                                style={{ fontSize: '12px' }}
+                                // startIcon={<image src={upload} />}
+                                children={'Filter'}
+                                onClick={() => getFilterData()}
+                            />
+                        </div>
+                    </div>}
+                </div>
+                {selectedDS?.value === "Manual" && <div className="d-flex">
+                    <div className="p-3 ps-0 ms-2">
+                        <button
+                            className="btn btn-primary"
+                            lineHeight={'24px'}
+                            height={'44px'}
+                            style={{ fontSize: '12px' }}
+                            // startIcon={<image src={upload} />}
+                            children={'Upload CSV File'}
+                            onClick={() => handleButtonClick()}
+                        />{' '}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleFileChange}
+                            multiple={true}
+                            accept="*"
+                        />
+                    </div>
+                </div>}
             </div>
-            <div className="row gx-1 gy-1 p-2 pt-0">
-                {apidata?.map((item) => {
-                    if (item.name == "kpUnitsYTD.csv") {
-                        return handleGetData(item.name, item.data, item.inference, item.predictions)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpUnitsLost.csv") {
-                        return handleGetData(item.name, item.data, item.inference, item.predictions)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpPlantProd.csv") {
-                        return handleGetData(item.name, item.data, item.inference, item.predictions)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpUtilization.csv") {
-                        return handleGetData(item.name, item.data)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpLostCause.csv") {
-                        return handleGetData(item.name, item.data)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpUptime.csv") {
-                        return handleGetData(item.name, item.data)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpThroughput.csv") {
-                        return handleGetData(item.name, item.data)
-                    }
-                })}
-                {apidata?.map((item) => {
-                    if (item.name == "kpOpEx.csv") {
-                        return handleGetData(item.name, item.data)
-                    }
-                })}
-                <Popup {...{ showModal, setShowModal, headerTitle: title, children: getCharts()?.children, size: getCharts()?.size, fullscreen: getCharts()?.size == "xl" ? true : false, estimate: getCharts()?.estimate }} />
+            <div className="row ms-1" style={{ minHeight: "100vh" }}>
+                {apidata.length > 0 && <div className="row gx-1 gy-1 p-2 pt-0">
+                    {apidata?.map((item) => {
+                        if (item.name == "kpUnitsYTD.csv") {
+                            return handleGetData(item.name, item.data, item.inference, item.predictions)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpUnitsLost.csv") {
+                            return handleGetData(item.name, item.data, item.inference, item.predictions)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpPlantProd.csv") {
+                            return handleGetData(item.name, item.data, item.inference, item.predictions)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpUtilization.csv") {
+                            return handleGetData(item.name, item.data)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpLostCause.csv") {
+                            return handleGetData(item.name, item.data)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpUptime.csv") {
+                            return handleGetData(item.name, item.data)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpThroughput.csv") {
+                            return handleGetData(item.name, item.data)
+                        }
+                    })}
+                    {apidata?.map((item) => {
+                        if (item.name == "kpOpEx.csv") {
+                            return handleGetData(item.name, item.data)
+                        }
+                    })}
+                    <Popup {...{ showModal, setShowModal, headerTitle: title, children: getCharts()?.children, size: getCharts()?.size, fullscreen: getCharts()?.size == "xl" ? true : false, estimate: getCharts()?.estimate }} />
+                </div>}
             </div>
         </div>
     )

@@ -1,4 +1,4 @@
-export var options = {
+export var toptions = {
   chart: {
     type: 'bar',
     height: 350
@@ -21,12 +21,6 @@ export var options = {
     show: true,
     width: 2,
     colors: ['transparent']
-  },
-  xaxis: {
-    categories: ['Jan','Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul','Aug'],
-    labels: {
-      show: true,
-    }
   },
   yaxis: {
     title: {
